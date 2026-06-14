@@ -1,10 +1,11 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../models/game_theme.dart';
 
-class CaroBoard extends StatelessWidget {
+class CaroBoard extends StatefulWidget {
   final int boardSize;
   final double cellSize;
   final Map<Point<int>, String> cells;
@@ -23,27 +24,109 @@ class CaroBoard extends StatelessWidget {
   });
 
   @override
+  State<CaroBoard> createState() => _CaroBoardState();
+}
+
+class _CaroBoardState extends State<CaroBoard> with SingleTickerProviderStateMixin {
+  late final Ticker _ticker;
+  final Map<Point<int>, DateTime> _placementTimes = {};
+  static const _animationDuration = Duration(milliseconds: 300);
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    for (final point in widget.cells.keys) {
+      _placementTimes[point] = now.subtract(_animationDuration);
+    }
+
+    _ticker = createTicker((elapsed) {
+      final now = DateTime.now();
+      bool anyAnimating = false;
+      for (final time in _placementTimes.values) {
+        if (now.difference(time) < _animationDuration) {
+          anyAnimating = true;
+          break;
+        }
+      }
+
+      if (!anyAnimating) {
+        _ticker.stop();
+      }
+      setState(() {});
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant CaroBoard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    final now = DateTime.now();
+    bool addedAny = false;
+
+    _placementTimes.removeWhere((key, _) => !widget.cells.containsKey(key));
+
+    for (final entry in widget.cells.entries) {
+      final point = entry.key;
+      final value = entry.value;
+      final oldValue = oldWidget.cells[point];
+
+      if (oldValue != value) {
+        _placementTimes[point] = now;
+        addedAny = true;
+      }
+    }
+
+    if (addedAny) {
+      if (!_ticker.isTicking) {
+        _ticker.start();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _ticker.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final boardExtent = boardSize * cellSize;
+    final boardExtent = widget.boardSize * widget.cellSize;
+    final now = DateTime.now();
+    final Map<Point<int>, double> scales = {};
+
+    for (final entry in widget.cells.entries) {
+      final point = entry.key;
+      final time = _placementTimes[point];
+      if (time == null) {
+        scales[point] = 1.0;
+      } else {
+        final elapsed = now.difference(time);
+        final progress = (elapsed.inMilliseconds / _animationDuration.inMilliseconds).clamp(0.0, 1.0);
+        scales[point] = Curves.easeOutBack.transform(progress);
+      }
+    }
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTapUp: (details) {
-        final col = details.localPosition.dx ~/ cellSize;
-        final row = details.localPosition.dy ~/ cellSize;
-        if (row >= 0 && row < boardSize && col >= 0 && col < boardSize) {
-          onCellTap(row, col);
+        final col = details.localPosition.dx ~/ widget.cellSize;
+        final row = details.localPosition.dy ~/ widget.cellSize;
+        if (row >= 0 && row < widget.boardSize && col >= 0 && col < widget.boardSize) {
+          widget.onCellTap(row, col);
         }
       },
       child: RepaintBoundary(
         child: CustomPaint(
           size: Size.square(boardExtent),
           painter: _CaroBoardPainter(
-            boardSize: boardSize,
-            cellSize: cellSize,
-            cells: cells,
-            winningCells: winningCells,
-            theme: theme,
+            boardSize: widget.boardSize,
+            cellSize: widget.cellSize,
+            cells: widget.cells,
+            winningCells: widget.winningCells,
+            theme: widget.theme,
+            scales: scales,
           ),
         ),
       ),
@@ -57,6 +140,7 @@ class _CaroBoardPainter extends CustomPainter {
   final Map<Point<int>, String> cells;
   final Set<Point<int>> winningCells;
   final GameTheme theme;
+  final Map<Point<int>, double> scales;
 
   _CaroBoardPainter({
     required this.boardSize,
@@ -64,6 +148,7 @@ class _CaroBoardPainter extends CustomPainter {
     required this.cells,
     required this.winningCells,
     required this.theme,
+    required this.scales,
   });
 
   @override
@@ -143,6 +228,16 @@ class _CaroBoardPainter extends CustomPainter {
         continue;
       }
 
+      final scale = scales[point] ?? 1.0;
+
+      if (scale != 1.0) {
+        canvas.save();
+        final center = rect.center;
+        canvas.translate(center.dx, center.dy);
+        canvas.scale(scale);
+        canvas.translate(-center.dx, -center.dy);
+      }
+
       final textPainter = TextPainter(
         text: TextSpan(
           text: entry.value,
@@ -173,6 +268,10 @@ class _CaroBoardPainter extends CustomPainter {
           rect.top + (cellSize - textPainter.height) / 2,
         ),
       );
+
+      if (scale != 1.0) {
+        canvas.restore();
+      }
     }
   }
 
@@ -182,6 +281,7 @@ class _CaroBoardPainter extends CustomPainter {
         oldDelegate.cellSize != cellSize ||
         oldDelegate.cells != cells ||
         oldDelegate.winningCells != winningCells ||
-        oldDelegate.theme != theme;
+        oldDelegate.theme != theme ||
+        oldDelegate.scales != scales;
   }
 }

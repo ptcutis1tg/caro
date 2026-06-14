@@ -40,7 +40,7 @@ class _CaroGameScreenState extends State<CaroGameScreen> {
   int _boardSize = 20;
   int _pendingBoardSize = 20;
   double _sliderMax = 30;
-  final double _cellSize = 40.0;
+  final double _cellSize = 52.0;
   final Random _random = Random();
 
   Map<Point<int>, String> _board = {};
