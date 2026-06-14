@@ -8,6 +8,7 @@ import '../widgets/caro_board.dart';
 import '../widgets/caro_control_bar.dart';
 import '../widgets/caro_header.dart';
 import '../widgets/theme_selector_bottom_sheet.dart';
+import '../services/audio_manager.dart';
 
 enum GameMode { playerVsPlayer, playerVsMachine }
 
@@ -108,6 +109,7 @@ class _CaroGameScreenState extends State<CaroGameScreen> {
 
   @override
   void dispose() {
+    AudioManager.instance.stopPvPBgm();
     _transformationController.dispose();
     super.dispose();
   }
@@ -131,6 +133,12 @@ class _CaroGameScreenState extends State<CaroGameScreen> {
       _isConfigured = true;
       _initializeBoard();
     });
+
+    if (_gameMode == GameMode.playerVsPlayer) {
+      AudioManager.instance.startPvPBgm();
+    } else {
+      AudioManager.instance.stopPvPBgm();
+    }
   }
 
   void _openSetup() {
@@ -141,6 +149,7 @@ class _CaroGameScreenState extends State<CaroGameScreen> {
       }
       _isConfigured = false;
     });
+    AudioManager.instance.stopPvPBgm();
   }
 
   void _returnToSetupAfterLoss() {
@@ -149,6 +158,7 @@ class _CaroGameScreenState extends State<CaroGameScreen> {
       _pendingBoardSize = _boardSize;
       _initializeBoard();
     });
+    AudioManager.instance.stopPvPBgm();
   }
 
   void _resetScores() {
@@ -179,6 +189,7 @@ class _CaroGameScreenState extends State<CaroGameScreen> {
 
     setState(() {
       _setCell(r, c, _currentPlayer);
+      AudioManager.instance.playMove();
       if (_currentPlayer == 'O') {
         _lastMachineMove = Point(r, c);
       }
@@ -189,10 +200,15 @@ class _CaroGameScreenState extends State<CaroGameScreen> {
         if (_currentPlayer == 'X') {
           _scoreX++;
           _wallet += _winReward;
+          if (_gameMode == GameMode.playerVsMachine) {
+            AudioManager.instance.playWin();
+          }
         } else {
           _scoreO++;
           if (_gameMode == GameMode.playerVsPlayer) {
             _wallet += _winReward;
+          } else if (_gameMode == GameMode.playerVsMachine) {
+            AudioManager.instance.playLose();
           }
         }
       } else if (_checkDraw()) {
