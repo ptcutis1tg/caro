@@ -1,0 +1,35 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Flutter Windows Debug (with .env)",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "debug",
+      "deviceId": "windows",
+      "args": [
+        "--dart-define-from-file=.env"
+      ]
+    },
+    {
+      "name": "Flutter Windows Profile (with .env)",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "profile",
+      "deviceId": "windows",
+      "args": [
+        "--dart-define-from-file=.env"
+      ]
+    },
+    {
+      "name": "Flutter Windows Release (with .env)",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "release",
+      "deviceId": "windows",
+      "args": [
+        "--dart-define-from-file=.env"
+      ]
+    }
+  ]
+}

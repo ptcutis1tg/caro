@@ -109,146 +109,18 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _showForgotPasswordDialog() async {
-    final emailController = TextEditingController(
-      text: _emailController.text.trim(),
-    );
-    final formKey = GlobalKey<FormState>();
-    var isLoading = false;
-    String? errorMessage;
-
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            Future<void> submit() async {
-              if (!formKey.currentState!.validate()) {
-                return;
-              }
-
-              setDialogState(() {
-                isLoading = true;
-                errorMessage = null;
-              });
-
-              try {
-                await Supabase.instance.client.auth.resetPasswordForEmail(
-                  emailController.text.trim(),
-                );
-                if (!mounted || !dialogContext.mounted) {
-                  return;
-                }
-                Navigator.of(dialogContext).pop();
-                ScaffoldMessenger.of(this.context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Da gui email dat lai mat khau.'),
-                  ),
-                );
-              } on AuthException catch (error) {
-                if (!dialogContext.mounted) {
-                  return;
-                }
-                setDialogState(() {
-                  errorMessage = error.message;
-                });
-              } catch (_) {
-                if (!dialogContext.mounted) {
-                  return;
-                }
-                setDialogState(() {
-                  errorMessage =
-                      'Khong the gui email dat lai mat khau. Vui long thu lai.';
-                });
-              } finally {
-                if (dialogContext.mounted) {
-                  setDialogState(() {
-                    isLoading = false;
-                  });
-                }
-              }
-            }
-
-            return AlertDialog(
-              backgroundColor: widget.currentTheme.cardBg,
-              title: Text(
-                'Quen mat khau',
-                style: TextStyle(
-                  color: widget.currentTheme.textColor,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              content: Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Nhap email de nhan lien ket dat lai mat khau.',
-                      style: TextStyle(color: widget.currentTheme.subTextColor),
-                    ),
-                    const SizedBox(height: 14),
-                    TextFormField(
-                      controller: emailController,
-                      enabled: !isLoading,
-                      keyboardType: TextInputType.emailAddress,
-                      textInputAction: TextInputAction.done,
-                      decoration: const InputDecoration(
-                        labelText: 'Email',
-                        prefixIcon: Icon(Icons.email_outlined),
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        final email = value?.trim() ?? '';
-                        if (email.isEmpty) {
-                          return 'Nhap email';
-                        }
-                        if (!email.contains('@')) {
-                          return 'Email khong hop le';
-                        }
-                        return null;
-                      },
-                      onFieldSubmitted: (_) => submit(),
-                    ),
-                    if (errorMessage != null) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        errorMessage!,
-                        style: const TextStyle(color: Colors.redAccent),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: isLoading
-                      ? null
-                      : () => Navigator.of(dialogContext).pop(),
-                  child: const Text('Huy'),
-                ),
-                FilledButton.icon(
-                  onPressed: isLoading ? null : submit,
-                  icon: isLoading
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.mark_email_read_outlined),
-                  label: const Text('Gui email'),
-                ),
-              ],
-            );
-          },
+        return _ForgotPasswordDialog(
+          currentTheme: widget.currentTheme,
+          initialEmail: _emailController.text.trim(),
+          loginScreenContext: context,
         );
       },
     );
-
-    emailController.dispose();
-  }
-
-  @override
+  }@override
   Widget build(BuildContext context) {
     final theme = widget.currentTheme;
 
@@ -448,6 +320,163 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ForgotPasswordDialog extends StatefulWidget {
+  final GameTheme currentTheme;
+  final String initialEmail;
+  final BuildContext loginScreenContext;
+
+  const _ForgotPasswordDialog({
+    required this.currentTheme,
+    required this.initialEmail,
+    required this.loginScreenContext,
+  });
+
+  @override
+  State<_ForgotPasswordDialog> createState() => _ForgotPasswordDialogState();
+}
+
+class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
+  late final TextEditingController _emailController;
+  final _formKey = GlobalKey<FormState>();
+  bool _isLoading = false;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController = TextEditingController(text: widget.initialEmail);
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    bool isPopped = false;
+
+    try {
+      await Supabase.instance.client.auth.resetPasswordForEmail(
+        _emailController.text.trim(),
+      );
+      if (!mounted) {
+        return;
+      }
+      isPopped = true;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(widget.loginScreenContext).showSnackBar(
+        const SnackBar(
+          content: Text('Da gui email dat lai mat khau.'),
+        ),
+      );
+    } on AuthException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _errorMessage = error.message;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _errorMessage =
+            'Khong the gui email dat lai mat khau. Vui long thu lai.';
+      });
+    } finally {
+      if (mounted && !isPopped) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: widget.currentTheme.cardBg,
+      title: Text(
+        'Quen mat khau',
+        style: TextStyle(
+          color: widget.currentTheme.textColor,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Nhap email de nhan lien ket dat lai mat khau.',
+              style: TextStyle(color: widget.currentTheme.subTextColor),
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _emailController,
+              enabled: !_isLoading,
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.done,
+              decoration: const InputDecoration(
+                labelText: 'Email',
+                prefixIcon: Icon(Icons.email_outlined),
+                border: OutlineInputBorder(),
+              ),
+              validator: (value) {
+                final email = value?.trim() ?? '';
+                if (email.isEmpty) {
+                  return 'Nhap email';
+                }
+                if (!email.contains('@')) {
+                  return 'Email khong hop le';
+                }
+                return null;
+              },
+              onFieldSubmitted: (_) => _submit(),
+            ),
+            if (_errorMessage != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                _errorMessage!,
+                style: const TextStyle(color: Colors.redAccent),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+          child: const Text('Huy'),
+        ),
+        FilledButton.icon(
+          onPressed: _isLoading ? null : _submit,
+          icon: _isLoading
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.mark_email_read_outlined),
+          label: const Text('Gui email'),
+        ),
+      ],
     );
   }
 }
